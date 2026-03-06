@@ -33,6 +33,24 @@ try:
 except Exception as e:
     print("❌ Error loading models:", e)
 
+def calculate_corpus(monthly_savings: float, current_age: int) -> int:
+    """
+    Corpus = FV of monthly savings at 5% until age 50 only.
+    No existing_savings or previous corpus — generate new from current data only.
+    - 0 contributions → use predicted monthly_savings.
+    - 1 contribution (e.g. 500) → avg = 500, corpus from that.
+    - 2+ contributions → avg = total / number of contributions, corpus from that.
+    """
+    if current_age >= 50 or monthly_savings <= 0:
+        return 0
+    years_to_50 = 50 - current_age
+    months = years_to_50 * 12
+    r = 0.05 / 12  # monthly rate 5% annual
+    # FV of monthly annuity: PMT * (((1 + r)^n - 1) / r)
+    fv = monthly_savings * (((1 + r) ** months - 1) / r)
+    return round(fv)
+
+
 class UserProfile(BaseModel):
     """
     More forgiving profile schema so frontend requests never fail with 422.
@@ -50,6 +68,8 @@ class UserProfile(BaseModel):
     max_wage: float = 0.0
     min_days: int = 0
     max_days: int = 0
+    avg_monthly_savings: float = 0.0  # Total contributions / months since signup (from frontend)
+    total_contributed: float = 0.0     # Sum of all contributions (optional, for reference)
 
 @app.get("/health")
 def health():
@@ -70,6 +90,7 @@ def predict(user: UserProfile):
             "daily_savings": 0,
             "best_scheme": "N/A",
             "retirement_corpus": 0,
+            "pension_per_month": 0,
             "worst_income": 0,
             "best_income": 0,
             "expected_income": 0,
@@ -92,7 +113,9 @@ def predict(user: UserProfile):
     ]]
     monthly_savings = round(savings_model.predict(features)[0])
     best_scheme = scheme_model.predict(features)[0]
-    corpus = round(corpus_model.predict(features)[0])
+    # 0 contributions → use predicted monthly_savings; 1+ contributions → use avg (total / number of contributions)
+    effective_monthly_savings = user.avg_monthly_savings if user.avg_monthly_savings > 0 else monthly_savings
+    corpus = calculate_corpus(float(effective_monthly_savings), user.age)
     daily_savings = round(monthly_savings / user.min_days) if user.min_days > 0 else 0
     if worst_income < user.monthly_expenses:
         warning = "⚠️ Bad months may not cover expenses! Build ₹5,000 emergency fund first."
@@ -100,6 +123,9 @@ def predict(user: UserProfile):
         warning = "🟡 Savings are low. Try to reduce expenses."
     else:
         warning = "✅ You're on a good track!"
+    # Pension per month = (retirement_corpus * 0.06) / 12 (6% annual drawdown, monthly)
+    pension_per_month = round((corpus * 0.06) / 12) if corpus else 0
+
     plan = {
         "user_id": user.user_id,
         "worst_income": worst_income,
@@ -109,6 +135,7 @@ def predict(user: UserProfile):
         "daily_savings": daily_savings,
         "best_scheme": best_scheme,
         "retirement_corpus": corpus,
+        "pension_per_month": pension_per_month,
         "years_to_retire": years_to_retire,
         "warning": warning,
         "created_at": datetime.now().isoformat()
