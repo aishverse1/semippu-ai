@@ -5,15 +5,26 @@ import random
 random.seed(42)
 np.random.seed(42)
 
-def generate_dataset(num_records=1000):
+def _corpus_formula(monthly_savings: float, age: int, retirement_age: int = 58) -> int:
+    """Same as main.calculate_corpus: 6% compounded monthly until 58, FV of annuity."""
+    if age >= retirement_age or monthly_savings <= 0:
+        return 0
+    years_to_retire = retirement_age - age
+    months = years_to_retire * 12
+    r = 0.06 / 12
+    fv = monthly_savings * (((1 + r) ** months - 1) / r)
+    return round(fv)
+
+
+def generate_dataset(num_records=5000):
     data = []
     for _ in range(num_records):
         age = random.randint(20, 55)
-        retirement_age_goal = random.randint(55, 65)
+        retirement_age_goal = 58  # fixed retirement age
         dependents = random.randint(0, 4)
         monthly_expenses = random.randint(3000, 14000)
         existing_savings = random.randint(0, 50000)
-        min_wage = random.randint(300, 600)
+        min_wage = random.randint(300, 900)
         max_wage = random.randint(min_wage + 50, min_wage + 400)
         min_days = random.randint(10, 18)
         max_days = random.randint(min_days + 2, 26)
@@ -28,12 +39,8 @@ def generate_dataset(num_records=1000):
         else:
             savings_rate = round(random.uniform(0.10, 0.30), 2)
             savings_amount = round(disposable_income * savings_rate)
-        monthly_rate = 0.06 / 12
-        months = years_to_retire * 12
-        if monthly_rate > 0 and months > 0 and savings_amount > 0:
-            corpus = round(savings_amount * (((1 + monthly_rate) ** months - 1) / monthly_rate))
-        else:
-            corpus = existing_savings
+        # Aligned with main.calculate_corpus: 5% until 50, no existing_savings
+        corpus = _corpus_formula(savings_amount, age)
         if expected_income < 8000:
             investment_type = "Post Office RD"
         elif expected_income < 15000:

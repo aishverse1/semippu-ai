@@ -33,19 +33,17 @@ try:
 except Exception as e:
     print("❌ Error loading models:", e)
 
-def calculate_corpus(monthly_savings: float, current_age: int) -> int:
+def calculate_corpus(monthly_savings: float, current_age: int, retirement_age: int = 58) -> int:
     """
-    Corpus = FV of monthly savings at 5% until age 50 only.
-    No existing_savings or previous corpus — generate new from current data only.
-    - 0 contributions → use predicted monthly_savings.
-    - 1 contribution (e.g. 500) → avg = 500, corpus from that.
-    - 2+ contributions → avg = total / number of contributions, corpus from that.
+    Corpus = FV of monthly annuity at 6% compounded monthly until retirement_age (58).
+    FV = PMT × ((1+r)^n - 1) / r, r = 0.06/12, n = months to 58.
+    E.g. ₹1,400/month from 26→58 (384 months) → ~₹16,20,753.
     """
-    if current_age >= 50 or monthly_savings <= 0:
+    if current_age >= retirement_age or monthly_savings <= 0:
         return 0
-    years_to_50 = 50 - current_age
-    months = years_to_50 * 12
-    r = 0.05 / 12  # monthly rate 5% annual
+    years_to_retire = retirement_age - current_age
+    months = years_to_retire * 12
+    r = 0.06 / 12  # 6% annual, compounded monthly
     # FV of monthly annuity: PMT * (((1 + r)^n - 1) / r)
     fv = monthly_savings * (((1 + r) ** months - 1) / r)
     return round(fv)
@@ -115,7 +113,8 @@ def predict(user: UserProfile):
     best_scheme = scheme_model.predict(features)[0]
     # 0 contributions → use predicted monthly_savings; 1+ contributions → use avg (total / number of contributions)
     effective_monthly_savings = user.avg_monthly_savings if user.avg_monthly_savings > 0 else monthly_savings
-    corpus = calculate_corpus(float(effective_monthly_savings), user.age)
+    retirement_age = user.retirement_age if user.retirement_age > 0 else 58
+    corpus = calculate_corpus(float(effective_monthly_savings), user.age, retirement_age)
     daily_savings = round(monthly_savings / user.min_days) if user.min_days > 0 else 0
     if worst_income < user.monthly_expenses:
         warning = "⚠️ Bad months may not cover expenses! Build ₹5,000 emergency fund first."
