@@ -4,3 +4,4 @@ __pycache__/
 serviceAccountKey.json
 dataset.csv
 server.ts
+.DS_Store
