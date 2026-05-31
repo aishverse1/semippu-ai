@@ -150,14 +150,6 @@ http://127.0.0.1:8000/docs
 
 ---
 
-## Deployment
-
-Deployed on **Hugging Face Spaces** using Docker.
-
-Live at: `https://aishverse1-semippu-ai.hf.space`
-
----
-
 ## Novelty
 
 - Only AI model targeting daily wage workers specifically
